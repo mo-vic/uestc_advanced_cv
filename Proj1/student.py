@@ -4,6 +4,7 @@
 # CS 4495/6476 @ Georgia Tech
 import numpy as np
 from numpy import pi, exp, sqrt
+from scipy import ndimage as ndi
 from skimage import io, img_as_ubyte, img_as_float32
 from skimage.transform import rescale
 
@@ -22,8 +23,15 @@ def my_imfilter(image, filter):
 #####################################################################################################
 #                                            Your Code                                              #
 #####################################################################################################
-  filtered_image = None
-  assert filtered_image != None
+
+  (m, n) = filter.shape
+  if m % 2 == 0 or n % 2 == 0:
+    raise ValueError("The given filter has any even dimension")
+
+  # Filter should have the same number of dimensions as image
+  filter = np.expand_dims(filter, -1)
+  filtered_image = ndi.correlate(image, filter, mode="constant")
+
 #####################################################################################################
 #                                               End                                                 #
 #####################################################################################################
@@ -60,18 +68,20 @@ def gen_hybrid_image(image1, image2, cutoff_frequency):
   #                                            Your Code                                              #
   #####################################################################################################
   # Your code here:
-  low_frequencies = None # Replace with your implementation
+
+  low_frequencies = my_imfilter(image1, kernel)
 
   # (2) Remove the low frequencies from image2. The easiest way to do this is to
   #     subtract a blurred version of image2 from the original version of image2.
   #     This will give you an image centered at zero with negative values.
   # Your code here #
-  high_frequencies = None # Replace with your implementation
 
+  high_frequencies = image2 - my_imfilter(image2, kernel)
 
   # (3) Combine the high frequencies and low frequencies
   # Your code here #
-  hybrid_image = None
+
+  hybrid_image = low_frequencies + high_frequencies
 
   # (4) At this point, you need to be aware that values larger than 1.0
   # or less than 0.0 may cause issues in the functions in Python for saving
