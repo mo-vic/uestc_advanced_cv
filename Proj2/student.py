@@ -47,9 +47,57 @@ def get_interest_points(image, feature_width):
 
     # TODO: Your implementation here!
 
-    # These are placeholders - replace with the coordinates of your interest points!
-    xs = np.asarray([0])
-    ys = np.asarray([0])
+    # Compute $I_x^2$, $I_y^2$, $I_{xy}$, $I_{yx}$
+    partial_x = filters.sobel_h(image)
+    partial_x2 = filters.sobel_h(partial_x)
+    partial_y = filters.sobel_v(image)
+    partial_y2 = filters.sobel_v(partial_y)
+    partial_xy = filters.sobel_v(partial_x)
+    partial_yx = filters.sobel_h(partial_y)
+
+
+    # Apply Gaussian filter, equivalent to compute elements of $M$
+    sigma = 1.0
+    partial_x2 = filters.gaussian(partial_x2, sigma=sigma)
+    partial_y2 = filters.gaussian(partial_y2, sigma=sigma)
+    partial_xy = filters.gaussian(partial_xy, sigma=sigma)
+    partial_yx = filters.gaussian(partial_yx, sigma=sigma)
+
+    if len(image.shape) == 2:
+        h, w = image.shape
+    else:
+        h, w, _ = image.shape
+
+    # Construct matrix M in all location
+    M = np.zeros(h * w * 4, np.float32)
+    M[0::4] = partial_x2.flatten()
+    M[1::4] = partial_xy.flatten()
+    M[2::4] = partial_yx.flatten()
+    M[3::4] = partial_y2.flatten()
+    M = M.reshape((-1, 2, 2))
+
+    det_M = np.linalg.det(M)
+    tr_M = np.trace(M, axis1=1, axis2=2)
+
+    # Parameters used in harris corner detector
+    k = 0.04
+    c = 0.02
+
+    # Compute cornerness score
+    cornerness = det_M - k * np.square(tr_M)
+
+    # For $|R| < \epsilon$, used to remove flat area
+    cornerness[cornerness < c * cornerness.max()] = 0
+
+    # Recover shape
+    cornerness = cornerness.reshape((h, w))
+
+    # Non max suppression
+    coordinates = feature.peak_local_max(cornerness, min_distance=15)
+
+    # Be aware of the index for xs and ys
+    xs = coordinates[:, 1]
+    ys = coordinates[:, 0]
 
     return xs, ys
 
@@ -119,10 +167,96 @@ def get_features(image, x, y, feature_width):
 
     '''
 
-    # TODO: Your implementation here! 
+    # TODO: Your implementation here!
 
-    # This is a placeholder - replace this with your features!
-    features = np.asarray([0])
+    if len(image.shape) == 2:
+        h, w = image.shape
+    else:
+        h, w, _ = image.shape
+
+    offset = feature_width // 2
+    num_points = x.shape[0]
+
+    # Range of index
+    x_start = x - offset
+    x_stop = x + offset
+    y_start = y - offset
+    y_stop = y + offset
+
+    # Compute padding parameters
+    x_min = x_start.min()
+    x_max = x_stop.max()
+    y_min = y_start.min()
+    y_max = y_stop.max()
+
+    x_pad = [0, 0]
+    y_pad = [0, 0]
+    if x_min < 0:
+        x_pad[0] = -x_min
+    if y_min < 0:
+        y_pad[0] = -y_min
+    if x_max - w >= 0:
+        x_pad[1] = x_max - w + 1
+    if y_max - h >= 0:
+        y_pad[1] = y_max - h + 1
+
+    x_start += x_pad[0]
+    x_stop += x_pad[0]
+    y_start += y_pad[0]
+    y_stop += y_pad[0]
+
+    # Pad the input image
+    image = np.pad(image, [y_pad, x_pad], mode="constant")
+
+    # Index under the window for each dimension
+    cell_size = 4
+    num_blocks = feature_width // cell_size
+
+    x_idx = np.array([np.arange(start, stop) for start, stop in zip(x_start, x_stop)])
+    y_idx = np.array([np.arange(start, stop) for start, stop in zip(y_start, y_stop)])
+
+    # Before transpose -> (num_blocks, num_points, cell_size)
+    x_idx = np.array(np.split(x_idx, num_blocks, axis=1))
+    y_idx = np.array(np.split(y_idx, num_blocks, axis=1))
+
+    # After transpose -> (num_points, num_blocks, cell_size)
+    x_idx = x_idx.transpose([1, 0, 2])
+    y_idx = y_idx.transpose([1, 0, 2])
+
+    # Index for every pixel under the window
+    x_idx = np.tile(np.tile(x_idx, cell_size), [1, num_blocks, 1]).flatten()
+    y_idx = np.tile(np.repeat(y_idx, cell_size, axis=2), num_blocks).flatten()
+
+    # Compute partial derivatives
+    partial_x = filters.sobel_h(image)
+    partial_y = filters.sobel_v(image)
+    # Comput gradient magnitude
+    magnitude = np.sqrt(partial_x * partial_x + partial_y * partial_y)
+    # Compute gradient orientation
+    orientation = np.arctan2(partial_y, partial_x) + np.pi
+    # Assign gradient to the nearest angle. Should use round instead of floor
+    orientation = np.mod(np.round(orientation / (2.0 * np.pi) * 8.0), 8)
+    orientation = orientation.astype(np.int32)
+    # Smooth the gradient magnitude
+    magnitude = filters.gaussian(magnitude, sigma=offset)
+
+    # Retrieve values of all patches as an 1D array
+    magnitude_in_pixels = magnitude[y_idx, x_idx]
+    orientation_in_pixels = orientation[y_idx, x_idx]
+
+    # Reshape the pixel array to (num_patches, cell_size, cell_size)
+    magnitude_in_cells = magnitude_in_pixels.reshape((-1, cell_size * cell_size))
+    orientation_in_cells = orientation_in_pixels.reshape((-1, cell_size * cell_size))
+
+    # Compute weight sum of orientations in each cell
+    features = np.array(list(map(lambda array, weight : np.bincount(array, weight, minlength=8), orientation_in_cells, magnitude_in_cells)))
+
+    # Reshape the features to (num_points, feature_length), each row represents the feature for a keypoint
+    # Normalize -> Clamp -> Renormalize
+    features = features.reshape((num_points, -1))
+    features = features / np.linalg.norm(features, axis=-1).reshape((-1, 1))
+    features[features >= 0.2] = 0.2
+    features = features / np.linalg.norm(features, axis=-1).reshape((-1, 1))
 
     return features
 
@@ -167,9 +301,19 @@ def match_features(im1_features, im2_features):
 
     # TODO: Your implementation here!
 
-    # These are placeholders - replace with your matches and confidences!
+    m, n = im1_features.shape[0], im2_features.shape[0]
+    dist = np.repeat(im1_features, n, axis=0) - np.tile(im2_features, [m, 1])
+    dist = np.sqrt(np.sum(np.square(dist), axis=1))
+    dist = dist.reshape((m, n))
+    sorted_index = np.argsort(dist, axis=1)
 
-    matches = np.asarray([0,0])
-    confidences = np.asarray([0])
+    thres = 0.95
+    aux_idx = np.arange(m)
+    ratio = dist[aux_idx, sorted_index[:, 0]] / dist[aux_idx, sorted_index[:, 1]]
+    ratio[np.isnan(ratio)] = 1.0
+
+    matched_idx = (ratio <= thres)
+    confidences = 1.0 - ratio[ratio <= thres]
+    matches = np.stack([aux_idx[matched_idx], sorted_index[matched_idx, 0]], axis=1)
 
     return matches, confidences
