@@ -45,20 +45,18 @@ def get_interest_points(image, feature_width):
 
     # TODO: Your implementation here!
 
-    # Compute $I_x^2$, $I_y^2$, $I_{xy}$, $I_{yx}$
+    # Compute $I_x^2$, $I_y^2$, $I_x * I_y$
     partial_x = filters.sobel_h(image)
-    partial_x2 = filters.sobel_h(partial_x)
+    partial_x2 = np.square(partial_x)
     partial_y = filters.sobel_v(image)
-    partial_y2 = filters.sobel_v(partial_y)
-    partial_xy = filters.sobel_v(partial_x)
-    partial_yx = filters.sobel_h(partial_y)
+    partial_y2 = np.square(partial_y)
+    partial_xy = partial_x * partial_y
 
     # Apply Gaussian filter, equivalent to compute elements of $M$
     sigma = 1.0
     partial_x2 = filters.gaussian(partial_x2, sigma=sigma)
     partial_y2 = filters.gaussian(partial_y2, sigma=sigma)
     partial_xy = filters.gaussian(partial_xy, sigma=sigma)
-    partial_yx = filters.gaussian(partial_yx, sigma=sigma)
 
     if len(image.shape) == 2:
         h, w = image.shape
@@ -69,7 +67,7 @@ def get_interest_points(image, feature_width):
     M = np.zeros(h * w * 4, np.float32)
     M[0::4] = partial_x2.flatten()
     M[1::4] = partial_xy.flatten()
-    M[2::4] = partial_yx.flatten()
+    M[2::4] = partial_xy.flatten()
     M[3::4] = partial_y2.flatten()
     M = M.reshape((-1, 2, 2))
 
