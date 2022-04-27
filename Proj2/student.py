@@ -1,7 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from skimage import filters, feature, img_as_int
-from skimage.measure import regionprops
+from skimage import filters, feature
 
 
 def get_interest_points(image, feature_width):
@@ -54,7 +52,6 @@ def get_interest_points(image, feature_width):
     partial_y2 = filters.sobel_v(partial_y)
     partial_xy = filters.sobel_v(partial_x)
     partial_yx = filters.sobel_h(partial_y)
-
 
     # Apply Gaussian filter, equivalent to compute elements of $M$
     sigma = 1.0
@@ -249,7 +246,8 @@ def get_features(image, x, y, feature_width):
     orientation_in_cells = orientation_in_pixels.reshape((-1, cell_size * cell_size))
 
     # Compute weight sum of orientations in each cell
-    features = np.array(list(map(lambda array, weight : np.bincount(array, weight, minlength=8), orientation_in_cells, magnitude_in_cells)))
+    features = np.array(list(
+        map(lambda array, weight: np.bincount(array, weight, minlength=8), orientation_in_cells, magnitude_in_cells)))
 
     # Reshape the features to (num_points, feature_length), each row represents the feature for a keypoint
     # Normalize -> Clamp -> Renormalize
