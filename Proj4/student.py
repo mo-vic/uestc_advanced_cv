@@ -1,4 +1,5 @@
 from utils import *
+
 import os.path as osp
 from glob import glob
 from functools import partial
@@ -64,7 +65,8 @@ def get_positive_features(train_path_pos, feature_params):
     the HoG features that matches the structure of the template if you set cells_per_block = (1, 1). And I found 
     cells_per_block = (1, 1) works better only in terms of training accuracy, the testing performance is terrible.
     """
-    f = lambda x : hog(load_image_gray(x), orientations=orientations, pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1), feature_vector=True).reshape((-1, n_cell ** 2 * orientations))
+    f = lambda x: hog(load_image_gray(x), orientations=orientations, pixels_per_cell=(cell_size, cell_size),
+                      cells_per_block=(1, 1), feature_vector=True).reshape((-1, n_cell ** 2 * orientations))
     feats = np.concatenate(list(map(f, positive_files)))
 
     ###########################################################################
@@ -132,8 +134,12 @@ def get_random_negative_features(non_face_scn_path, feature_params, num_samples)
     the HoG features that matches the structure of the template if you set cells_per_block = (1, 1). And I found 
     cells_per_block = (1, 1) works better only in terms of training accuracy, the testing performance is terrible.
     """
-    f = lambda x : (lambda im=load_image_gray(x[0]) : [hog(im[start:start+win_size, stop:stop+win_size], orientations=orientations, pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1), feature_vector=True).reshape((-1, n_cell ** 2 * orientations))
-    for start, stop in zip(np.random.randint(0, im.shape[0] - win_size, x[1]), np.random.randint(0, im.shape[1] - win_size, x[1]))])()
+    f = lambda x: (lambda im=load_image_gray(x[0]): [
+        hog(im[start:start + win_size, stop:stop + win_size], orientations=orientations,
+            pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1), feature_vector=True).reshape(
+            (-1, n_cell ** 2 * orientations))
+        for start, stop in
+        zip(np.random.randint(0, im.shape[0] - win_size, x[1]), np.random.randint(0, im.shape[1] - win_size, x[1]))])()
 
     feats = np.concatenate(list(map(f, zip(negative_files, num_per_img)))).squeeze(1)
 
@@ -144,7 +150,7 @@ def get_random_negative_features(non_face_scn_path, feature_params, num_samples)
     return feats
 
 
-def train_classifier(features_pos, features_neg, C, class_weight={1:10}):
+def train_classifier(features_pos, features_neg, C, class_weight={1: 10}):
     """
     This function trains a linear SVM classifier on the positive and negative
     features obtained from the previous steps. We fit a model to the features
@@ -222,20 +228,20 @@ def slide2d(array, win_size, stride=1):
     return blocks
 
 
-
 def mining(file_path, svm, win_size, cell_size, orientations):
     # Loading image
     image = load_image_gray(file_path)
 
     # Extract HoG features
-    hog_feats = hog(image, orientations=orientations, pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1), feature_vector=False)
+    hog_feats = hog(image, orientations=orientations, pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1),
+                    feature_vector=False)
 
     # Group HoG features into blocks by sliding over `hog_feats`
     n_cell = win_size // cell_size
     hog_feats = slide2d(hog_feats, win_size=n_cell)
 
     # Reshape to (`num_blocks`, -1), here `num_blocks` matches win_size, i.e., the structure of the template
-    n_blocks_col, n_blocks_row =  hog_feats.shape[:2]
+    n_blocks_col, n_blocks_row = hog_feats.shape[:2]
     hog_feats = hog_feats.reshape((n_blocks_col * n_blocks_row, -1))
 
     # Make predictions on all blocks
@@ -287,8 +293,10 @@ def mine_hard_negs(non_face_scn_path, svm, feature_params):
     #                           TODO: YOUR CODE HERE                          #
     ###########################################################################
 
-    feats = np.concatenate(list(map(partial(mining, svm=svm, win_size=win_size, cell_size=cell_size, orientations=orientations), negative_files)))
-    
+    feats = np.concatenate(list(
+        map(partial(mining, svm=svm, win_size=win_size, cell_size=cell_size, orientations=orientations),
+            negative_files)))
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -408,16 +416,17 @@ def run_detector(test_scn_path, svm, feature_params, threshold=0.5, verbose=Fals
 
         for scale_rate in multi_scale_factor:
             scaled_im = rescale(im, scale=scale_rate, anti_aliasing=True)
-            hog_feats = hog(scaled_im, orientations=orientations, pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1), feature_vector=False)
+            hog_feats = hog(scaled_im, orientations=orientations, pixels_per_cell=(cell_size, cell_size),
+                            cells_per_block=(1, 1), feature_vector=False)
 
-            n_blocks_col, n_blocks_row =  hog_feats.shape[:2]
+            n_blocks_col, n_blocks_row = hog_feats.shape[:2]
             if (n_blocks_col // n_cell) * (n_blocks_row // n_cell) == 0:
                 break
 
             hog_feats = slide2d(hog_feats, win_size=n_cell)
 
             # Reshape to (`num_blocks`, -1), here `num_blocks` matches win_size, i.e., the structure of the template
-            n_blocks_col, n_blocks_row =  hog_feats.shape[:2]
+            n_blocks_col, n_blocks_row = hog_feats.shape[:2]
             hog_feats = hog_feats.reshape((n_blocks_col * n_blocks_row, -1))
 
             # Compute confidence on all blocks
@@ -425,7 +434,6 @@ def run_detector(test_scn_path, svm, feature_params, threshold=0.5, verbose=Fals
 
             # Reshape confidences to (n_blocks_col, n_blocks_row)
             confidences_per_scale = confidences_per_scale.reshape((n_blocks_col, n_blocks_row))
-
 
             detected_faces = (confidences_per_scale >= thres)
             confidences_per_scale = confidences_per_scale[detected_faces].flatten()
@@ -466,8 +474,8 @@ def run_detector(test_scn_path, svm, feature_params, threshold=0.5, verbose=Fals
     confidences = np.hstack(confidences)
     image_ids = np.array(image_ids)
 
-        #######################################################################
-        #                          END OF YOUR CODE                           #
-        #######################################################################
+    #######################################################################
+    #                          END OF YOUR CODE                           #
+    #######################################################################
 
     return bboxes, confidences, image_ids
