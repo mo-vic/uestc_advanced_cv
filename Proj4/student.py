@@ -66,7 +66,7 @@ def get_positive_features(train_path_pos, feature_params):
     cells_per_block = (1, 1) works better only in terms of training accuracy, the testing performance is terrible.
     """
     f = lambda x: hog(load_image_gray(x), orientations=orientations, pixels_per_cell=(cell_size, cell_size),
-                      cells_per_block=(1, 1), feature_vector=True).reshape((-1, n_cell ** 2 * orientations))
+                      cells_per_block=(n_cell, n_cell), feature_vector=True).reshape((-1, n_cell ** 2 * orientations))
     feats = np.concatenate(list(map(f, positive_files)))
 
     ###########################################################################
@@ -136,7 +136,7 @@ def get_random_negative_features(non_face_scn_path, feature_params, num_samples)
     """
     f = lambda x: (lambda im=load_image_gray(x[0]): [
         hog(im[start:start + win_size, stop:stop + win_size], orientations=orientations,
-            pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1), feature_vector=True).reshape(
+            pixels_per_cell=(cell_size, cell_size), cells_per_block=(n_cell, n_cell), feature_vector=True).reshape(
             (-1, n_cell ** 2 * orientations))
         for start, stop in
         zip(np.random.randint(0, im.shape[0] - win_size, x[1]), np.random.randint(0, im.shape[1] - win_size, x[1]))])()
@@ -232,13 +232,11 @@ def mining(file_path, svm, win_size, cell_size, orientations):
     # Loading image
     image = load_image_gray(file_path)
 
-    # Extract HoG features
-    hog_feats = hog(image, orientations=orientations, pixels_per_cell=(cell_size, cell_size), cells_per_block=(1, 1),
-                    feature_vector=False)
-
-    # Group HoG features into blocks by sliding over `hog_feats`
     n_cell = win_size // cell_size
-    hog_feats = slide2d(hog_feats, win_size=n_cell)
+
+    # Extract HoG features
+    hog_feats = hog(image, orientations=orientations, pixels_per_cell=(cell_size, cell_size),
+                    cells_per_block=(n_cell, n_cell), feature_vector=False)
 
     # Reshape to (`num_blocks`, -1), here `num_blocks` matches win_size, i.e., the structure of the template
     n_blocks_col, n_blocks_row = hog_feats.shape[:2]
@@ -364,7 +362,7 @@ def run_detector(test_scn_path, svm, feature_params, threshold=0.5, verbose=Fals
     im_filenames = sorted(glob(osp.join(test_scn_path, '*.jpg')))
 
     # Number of top detections to feed to NMS
-    topk = 200
+    topk = 500
 
     # Confidence threshold
     thres = threshold
@@ -416,14 +414,13 @@ def run_detector(test_scn_path, svm, feature_params, threshold=0.5, verbose=Fals
 
         for scale_rate in multi_scale_factor:
             scaled_im = rescale(im, scale=scale_rate, anti_aliasing=True)
-            hog_feats = hog(scaled_im, orientations=orientations, pixels_per_cell=(cell_size, cell_size),
-                            cells_per_block=(1, 1), feature_vector=False)
 
-            n_blocks_col, n_blocks_row = hog_feats.shape[:2]
-            if (n_blocks_col // n_cell) * (n_blocks_row // n_cell) == 0:
+            height, width = scaled_im.shape
+            if height < win_size or width < win_size:
                 break
 
-            hog_feats = slide2d(hog_feats, win_size=n_cell)
+            hog_feats = hog(scaled_im, orientations=orientations, pixels_per_cell=(cell_size, cell_size),
+                            cells_per_block=(n_cell, n_cell), feature_vector=False)
 
             # Reshape to (`num_blocks`, -1), here `num_blocks` matches win_size, i.e., the structure of the template
             n_blocks_col, n_blocks_row = hog_feats.shape[:2]
