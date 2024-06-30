@@ -2,12 +2,15 @@
 
 ### 1. Harris角点检测器
 
-Harris角点检测器使用一个二元函数来描述当图像沿着任意方向$(u, v)$进行平移时的像素强度差分，其表达式如下：
-$$
+Harris角点检测器使用一个二元函数来描述当图像沿着任意方向 $(u, v)$ 进行平移时的像素强度差分，其表达式如下：
+
+```math
 E(u, v) = \sum_{x, y}w(x, y)[I(x+u, y+v) - I(x, y)]^2
-$$
-其中$w(x, y)$是窗口函数，它可以是矩形窗口，窗口内的取值全部为1，也可以是高斯窗口，窗口内的取值为二元高斯函数的函数值。显然，$E(0, 0)$是$E(u, v)$的局部极小值点，将$I(x+u, y+v)$在点$(x, y)$处进行一阶泰勒展开，可以得到：
-$$
+```
+
+其中 $w(x, y)$ 是窗口函数，它可以是矩形窗口，窗口内的取值全部为1，也可以是高斯窗口，窗口内的取值为二元高斯函数的函数值。显然， $E(0, 0)$ 是 $E(u, v)$ 的局部极小值点，将 $I(x+u, y+v)$ 在点 $(x, y)$ 处进行一阶泰勒展开，可以得到：
+
+```math
 E(u, v) = \sum_{x, y}w(x, y)[I(x+u, y+v) - I(x, y)]^2 \\
 \approx \sum_{x, y}w(x, y)[I(x, y) + I_x u + I_y v - I(x, y)]^2 \\
 =\sum_{x, y}w(x, y)[I_x u + I_y v]^2 \\
@@ -20,26 +23,41 @@ E(u, v) = \sum_{x, y}w(x, y)[I(x+u, y+v) - I(x, y)]^2 \\
 \sum_{x, y}w(x, y)
 \left[\begin{array}{cc}I_x I_x &I_x I_y \\ I_x I_y &I_y I_y\end{array}\right]
 \left[\begin{array}{c}u \\ v\end{array}\right]
-$$
-令$M = \sum_{x, y}w(x, y)
-\left[\begin{array}{cc}I_x I_x &I_x I_y \\ I_x I_y &I_y I_y\end{array}\right]$，则$E(u, v) \approx \left[\begin{array}{cc}u &v\end{array}\right] M 
-\left[\begin{array}{c}u \\ v\end{array}\right]$。其中$I_x$和$I_y$分别是图像在沿着$x$方向和$y$方向上的偏导数。
+```
 
-紧接着根据矩阵$M$构造一个响应函数$R$，其方程为：
-$$
-R = \det(M) - k[\tr(M)^2]
-$$
+令：
+
+```math
+M = \sum_{x, y}w(x, y)
+\left[\begin{array}{cc}I_x I_x &I_x I_y \\ I_x I_y &I_y I_y\end{array}\right]
+```
+
+ 则
+
+```math
+E(u, v) \approx \left[\begin{array}{cc}u &v\end{array}\right] M 
+\left[\begin{array}{c}u \\ v\end{array}\right]
+```
+
+其中 $I_x$ 和 $I_y$ 分别是图像在沿着 $x$ 方向和 $y$ 方向上的偏导数。
+
+紧接着根据矩阵 $M$ 构造一个响应函数 $R$ ，其方程为：
+
+```math
+R = \det(M) - k[\mathrm{tr}(M)^2]
+```
+
 其中：
 
 * $\det(M) = \lambda_1 \cdot \lambda_2$；
-* $\tr(M) = \lambda_1 + \lambda_2$；
-* $\lambda_1$和$\lambda_2$分别是矩阵$M$的两个特征值。
+* $\mathrm{tr}(M) = \lambda_1 + \lambda_2$；
+* $\lambda_1$和 $\lambda_2$ 分别是矩阵 $M$ 的两个特征值。
 
-因此$R$是$\lambda_1$和$\lambda_2$的函数，它们共同决定了一个窗口区域是平面、边缘还是角点：
+因此 $R$ 是 $\lambda_1$ 和 $\lambda_2$ 的函数，它们共同决定了一个窗口区域是平面、边缘还是角点：
 
-* 当$|R|$很小时，则$\lambda_1$和$\lambda_2$也很小，此时该区域是平面；
-* 当$R < 0$时，则有$\lambda_1 \gg \lambda_2$或$\lambda_1 \ll \lambda_2$，此时该区域是边缘；
-* 当$R$很大且$\lambda_1$与$\lambda_2$数值大小相当，即$\lambda_1 \sim \lambda_2$时，此时该区域是角点。
+* 当 $|R|$ 很小时，则 $\lambda_1$ 和 $\lambda_2$ 也很小，此时该区域是平面；
+* 当 $R < 0$ 时，则有 $\lambda_1 \gg \lambda_2$ 或 $\lambda_1 \ll \lambda_2$ ，此时该区域是边缘；
+* 当 $R$ 很大且 $\lambda_1$ 与 $\lambda_2$ 数值大小相当，即 $\lambda_1 \sim \lambda_2$ 时，此时该区域是角点。
 
 ```python
 def get_interest_points(image, feature_width):
@@ -119,8 +137,9 @@ def get_interest_points(image, feature_width):
 
 ### 2. 我自己的另一种推导方式
 
-将$E(u, v)$在$(0, 0)$点进行二阶泰勒展开代替$I(x+u, y+v)$在$(x, y)$点处的一阶泰勒展开：
-$$
+将 $E(u, v)$ 在 $(0, 0)$ 点进行二阶泰勒展开代替 $I(x+u, y+v)$ 在 $(x, y)$ 点处的一阶泰勒展开：
+
+```math
 E(u, v) = \sum_{x, y}w(x, y)[I(x+u, y+v) - I(x, y)]^2 \\
 \approx E(0, 0) + 
 \left[\begin{array}{cc}u &v\end{array}\right] 
@@ -137,10 +156,23 @@ E(u, v) = \sum_{x, y}w(x, y)[I(x+u, y+v) - I(x, y)]^2 \\
 \sum_{x, y}w(x, y)
 \left[\begin{array}{cc}I_{xx}(x, y) &I_{xy}(x, y) \\ I_{yx}(x, y) &I_{yy}(x, y)\end{array}\right]
 \left[\begin{array}{c}u \\ v\end{array}\right]
-$$
-令$M = \sum_{x, y}w(x, y)
-\left[\begin{array}{cc}I_{xx}(x, y) &I_{xy}(x, y) \\ I_{yx}(x, y) &I_{yy}(x, y)\end{array}\right]$，则$E(u, v) \approx \left[\begin{array}{cc}u &v\end{array}\right] M 
-\left[\begin{array}{c}u \\ v\end{array}\right]$。其中$I_{xx}$和$I_{yy}$分别是图像在沿着$x$方向和$y$方向上的二阶偏导数，$I_{xy}$和$I_{yx}$分别是图像的二阶混合偏导数。
+```
+
+令
+
+```math
+M = \sum_{x, y}w(x, y)
+\left[\begin{array}{cc}I_{xx}(x, y) &I_{xy}(x, y) \\ I_{yx}(x, y) &I_{yy}(x, y)\end{array}\right]
+```
+
+则
+
+```math
+E(u, v) \approx \left[\begin{array}{cc}u &v\end{array}\right] M 
+\left[\begin{array}{c}u \\ v\end{array}\right]
+```
+
+其中 $I_{xx}$ 和 $I_{yy}$ 分别是图像在沿着 $x$ 方向和 $y$ 方向上的二阶偏导数， $I_{xy}$ 和 $I_{yx}$ 分别是图像的二阶混合偏导数。
 
 ```python
 def get_interest_points(image, feature_width):
