@@ -52,9 +52,9 @@ topk = 200
 
 **AP**：
 
-`SVM_1`：$\approx 0.723$
+`SVM_1`$\approx 0.723$
 
-`SVM_2`：$\approx 0.361$
+`SVM_2`$\approx 0.361$
 
 （我已经调不动了，电脑扛不住了）
 
@@ -87,9 +87,9 @@ topk = 500
 
 **AP**：
 
-`SVM_1`：$\approx 0.761$
+`SVM_1`$\approx 0.761$
 
-`SVM_2`：$\approx 0.529$
+`SVM_2`$\approx 0.529$
 
 （我已经调不动了，电脑扛不住了）
 
